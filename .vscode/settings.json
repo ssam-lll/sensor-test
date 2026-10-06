@@ -1,0 +1,13 @@
+{
+    "C_Cpp.default.includePath": [
+        "C:/Users/Samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32",
+        "C:/Users/Samuel/.platformio/packages/framework-arduinoespressif32/variants/doitESP32devkitV1",
+        "C:/Users/Samuel/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/**",
+        "C:/Users/Samuel/Documents/PlatformIO/Projects/arduino/lib/**",
+        "C:/Users/Samuel/Documents/PlatformIO/Projects/sensor-test/lib/**",
+        "C:/Users/Samuel/Documents/PlatformIO/Projects/**"
+    ],
+    "C_Cpp.default.forcedInclude": [
+        "C:/Users/Samuel/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h"
+    ]
+}
