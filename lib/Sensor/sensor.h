@@ -9,8 +9,8 @@ private:
 
 public:
     Sensor(int pin);
-    int read();
-
+    int leer();
+    int verificarError(int valor);
 };
 
 #endif
