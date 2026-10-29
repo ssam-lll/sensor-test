@@ -1,14 +1,17 @@
 #include "sensor.h"
 
-Sensor::Sensor(int pin) {
-    _pin = pin;
+BarraSensores::BarraSensores(Multiplexor& mux) : _mux(mux) {}
+
+void BarraSensores::begin() {
 }
 
-int Sensor::leer() {
-    return analogRead(_pin);
+void BarraSensores::leerBarra(int valores[8]) {
+    for (uint8_t i = 0; i < NUM_SENSORES; i++) {
+        valores[i] = _mux.leerCanal(_canales[i]);
+    }
 }
 
-int Sensor::verificarError(int valor) {
+int BarraSensores::verificarError(int valor) {
     if (valor <= 0 || valor > 4095) {
         return 101;
     }

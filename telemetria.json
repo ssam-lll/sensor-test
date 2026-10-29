@@ -1,0 +1,447 @@
+[
+    {
+        "id": "tab_telemetria",
+        "type": "tab",
+        "label": "Telemetria & Control IoT",
+        "disabled": false,
+        "info": "Flujo bidireccional IoT con EMQX, MySQL, barra de 8 sensores y control de motores"
+    },
+    {
+        "id": "mqtt_broker_local",
+        "type": "mqtt-broker",
+        "name": "Broker EMQX Local",
+        "broker": "192.168.1.40",
+        "port": "1883",
+        "clientid": "NodeRED_IDLine_Hub",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true
+    },
+    {
+        "id": "71503c337fadd464",
+        "type": "MySQLdatabase",
+        "name": "",
+        "host": "127.0.0.1",
+        "port": "3306",
+        "db": "telemetria_iot",
+        "tz": "",
+        "charset": "UTF8"
+    },
+    {
+        "id": "60afd890d0ca291e",
+        "type": "ui_tab",
+        "name": "Telemetria & Control",
+        "icon": "dashboard",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "1c8f99ae2553855b",
+        "type": "ui_group",
+        "name": "Valor actual",
+        "tab": "60afd890d0ca291e",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false
+    },
+    {
+        "id": "92d36173878b6540",
+        "type": "ui_group",
+        "name": "Historico 1h",
+        "tab": "60afd890d0ca291e",
+        "order": 2,
+        "disp": true,
+        "width": 12,
+        "collapse": false
+    },
+    {
+        "id": "grp_motores",
+        "type": "ui_group",
+        "name": "Control TB6612FNG",
+        "tab": "60afd890d0ca291e",
+        "order": 3,
+        "disp": true,
+        "width": 6,
+        "collapse": false
+    },
+    {
+        "id": "grp_ack",
+        "type": "ui_group",
+        "name": "Acuse de Recibo (ACK)",
+        "tab": "60afd890d0ca291e",
+        "order": 4,
+        "disp": true,
+        "width": 6,
+        "collapse": false
+    },
+    {
+        "id": "sub_sensores",
+        "type": "mqtt in",
+        "z": "tab_telemetria",
+        "name": "infrarrojo",
+        "topic": "telemetria/sensores",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "mqtt_broker_local",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 200,
+        "wires": [
+            [
+                "fn_preparar_insert"
+            ]
+        ]
+    },
+    {
+        "id": "fn_preparar_insert",
+        "type": "function",
+        "z": "tab_telemetria",
+        "name": "Preparar INSERT",
+        "func": "const data = msg.payload;\n\nif (!data) return null;\n\nif (data.error && data.error !== 0) {\n    return [null, { payload: \"Error en el sensor: codigo \" + data.error }];\n}\n\n// Soporta tanto array de 8 sensores como formato individual previo\nlet lecturas = [];\nif (Array.isArray(data.sensores)) {\n    lecturas = data.sensores.map((val, idx) => ({ sensor: 's' + idx, valor: parseFloat(val) }));\n} else if (data.sensor && data.valor !== undefined) {\n    lecturas = [{ sensor: String(data.sensor), valor: parseFloat(data.valor) }];\n} else {\n    return [null, { payload: \"Formato de telemetria no valido\" }];\n}\n\nlet placeholders = [];\nlet params = [];\nfor (let i = 0; i < lecturas.length; i++) {\n    placeholders.push(\"(?, ?)\");\n    params.push(lecturas[i].sensor, lecturas[i].valor);\n}\n\nconst query = \"INSERT INTO telemetria (sensor, valor) VALUES \" + placeholders.join(\", \") + \";\";\n\nconst dbMsg = {\n    topic: query,\n    payload: params,\n    lectura: lecturas\n};\n\nreturn [dbMsg, null];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 200,
+        "wires": [
+            [
+                "node_mysql_db"
+            ],
+            [
+                "c0c5693c251dd862"
+            ]
+        ]
+    },
+    {
+        "id": "node_mysql_db",
+        "type": "mysql",
+        "z": "tab_telemetria",
+        "mydb": "71503c337fadd464",
+        "name": "telemetria_iot",
+        "x": 580,
+        "y": 200,
+        "wires": [
+            [
+                "fn_preparar_select"
+            ]
+        ]
+    },
+    {
+        "id": "fn_preparar_select",
+        "type": "function",
+        "z": "tab_telemetria",
+        "name": "Preparar SELECT",
+        "func": "if (!msg.lectura || !msg.payload || msg.payload.affectedRows < 1) {\n    return null;\n}\n\n// Devuelve cada sensor como mensaje individual para alimentar el grafico y el gauge\nreturn [msg.lectura.map(item => ({\n    topic: item.sensor,\n    payload: item.valor\n}))];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 800,
+        "y": 200,
+        "wires": [
+            [
+                "231de22833a3c5df",
+                "aec95a55bf6512d2"
+            ]
+        ]
+    },
+    {
+        "id": "aec95a55bf6512d2",
+        "type": "ui_gauge",
+        "z": "tab_telemetria",
+        "name": "IR Promedio/Actual",
+        "group": "1c8f99ae2553855b",
+        "order": 0,
+        "width": 6,
+        "height": 4,
+        "gtype": "gage",
+        "title": "IR",
+        "label": "units",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "4095",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1050,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "231de22833a3c5df",
+        "type": "ui_chart",
+        "z": "tab_telemetria",
+        "name": "Historico Sensores",
+        "group": "92d36173878b6540",
+        "order": 0,
+        "width": 12,
+        "height": 6,
+        "label": "Barrido Sensores (C4 - C11)",
+        "chartType": "line",
+        "legend": "true",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "Esperando lecturas...",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "4095",
+        "removeOlder": 1,
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1050,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c0c5693c251dd862",
+        "type": "ui_toast",
+        "z": "tab_telemetria",
+        "position": "top right",
+        "displayTime": "3",
+        "highlight": "",
+        "sendall": true,
+        "outputs": 0,
+        "ok": "OK",
+        "cancel": "",
+        "raw": false,
+        "className": "",
+        "topic": "",
+        "name": "show notification",
+        "x": 580,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "slider_m1",
+        "type": "ui_slider",
+        "z": "tab_telemetria",
+        "name": "Slider M1 (Izq)",
+        "label": "Motor Izq (-255 Rev | 0 Centro | 255 Av)",
+        "tooltip": "",
+        "group": "grp_motores",
+        "order": 1,
+        "width": 6,
+        "height": 1,
+        "passthru": false,
+        "outs": "end",
+        "topic": "m1",
+        "min": -255,
+        "max": 255,
+        "step": 5,
+        "x": 160,
+        "y": 420,
+        "wires": [
+            [
+                "fn_build_motor_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "slider_m2",
+        "type": "ui_slider",
+        "z": "tab_telemetria",
+        "name": "Slider M2 (Der)",
+        "label": "Motor Der (-255 Rev | 0 Centro | 255 Av)",
+        "tooltip": "",
+        "group": "grp_motores",
+        "order": 2,
+        "width": 6,
+        "height": 1,
+        "passthru": false,
+        "outs": "end",
+        "topic": "m2",
+        "min": -255,
+        "max": 255,
+        "step": 5,
+        "x": 160,
+        "y": 480,
+        "wires": [
+            [
+                "fn_build_motor_cmd"
+            ]
+        ]
+    },
+    {
+        "id": "fn_build_motor_cmd",
+        "type": "function",
+        "z": "tab_telemetria",
+        "name": "Formatear Comando Motores",
+        "func": "context.m1 = context.m1 || 0;\ncontext.m2 = context.m2 || 0;\n\nif (msg.topic === 'stop') {\n    context.m1 = 0;\n    context.m2 = 0;\n    return { payload: { cmd: 'stop', m1: 0, m2: 0 } };\n}\n\nif (msg.topic === 'm1') {\n    let v1 = parseInt(msg.payload) || 0;\n    context.m1 = (Math.abs(v1) <= 10) ? 0 : v1;\n}\nif (msg.topic === 'm2') {\n    let v2 = parseInt(msg.payload) || 0;\n    context.m2 = (Math.abs(v2) <= 10) ? 0 : v2;\n}\n\nreturn {\n    payload: {\n        cmd: 'set_motores',\n        m1: context.m1,\n        m2: context.m2\n    }\n};",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 440,
+        "wires": [
+            [
+                "pub_motores"
+            ]
+        ]
+    },
+    {
+        "id": "btn_stop",
+        "type": "ui_button",
+        "z": "tab_telemetria",
+        "name": "Paro Total",
+        "group": "grp_motores",
+        "order": 3,
+        "width": 3,
+        "height": 1,
+        "passthru": false,
+        "label": "PARO TOTAL",
+        "color": "#FFFFFF",
+        "bgcolor": "#D32F2F",
+        "icon": "",
+        "payload": "0",
+        "payloadType": "num",
+        "topic": "stop",
+        "x": 150,
+        "y": 540,
+        "wires": [
+            [
+                "fn_build_motor_cmd",
+                "slider_m1",
+                "slider_m2"
+            ]
+        ]
+    },
+    {
+        "id": "btn_test",
+        "type": "ui_button",
+        "z": "tab_telemetria",
+        "name": "Secuencia de Prueba",
+        "group": "grp_motores",
+        "order": 4,
+        "width": 3,
+        "height": 1,
+        "passthru": false,
+        "label": "SECUENCIA PRUEBA",
+        "color": "#FFFFFF",
+        "bgcolor": "#1976D2",
+        "icon": "",
+        "payload": "{\"cmd\":\"test\"}",
+        "payloadType": "json",
+        "topic": "",
+        "x": 190,
+        "y": 600,
+        "wires": [
+            [
+                "pub_motores"
+            ]
+        ]
+    },
+    {
+        "id": "pub_motores",
+        "type": "mqtt out",
+        "z": "tab_telemetria",
+        "name": "Publicar Motores",
+        "topic": "control/motores",
+        "qos": "2",
+        "retain": "false",
+        "broker": "mqtt_broker_local",
+        "x": 720,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "sub_ack",
+        "type": "mqtt in",
+        "z": "tab_telemetria",
+        "name": "ACK Motores In",
+        "topic": "telemetria/motores/estado",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "mqtt_broker_local",
+        "x": 160,
+        "y": 680,
+        "wires": [
+            [
+                "fn_ack_text"
+            ]
+        ]
+    },
+    {
+        "id": "fn_ack_text",
+        "type": "function",
+        "z": "tab_telemetria",
+        "name": "Formatear ACK",
+        "func": "const ack = msg.payload;\nreturn {\n    payload: 'Estado: ' + (ack.status || 'OK') + ' | M1: ' + ack.m1 + ' | M2: ' + ack.m2\n};",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 680,
+        "wires": [
+            [
+                "ui_text_ack"
+            ]
+        ]
+    },
+    {
+        "id": "ui_text_ack",
+        "type": "ui_text",
+        "z": "tab_telemetria",
+        "group": "grp_ack",
+        "order": 1,
+        "width": 6,
+        "height": 2,
+        "name": "Display ACK",
+        "label": "Ultimo ACK Recibido:",
+        "format": "{{msg.payload}}",
+        "layout": "col-center",
+        "x": 640,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "b3796ff8c47e7897",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-node-mysql": "3.0.3",
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]

@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <functional>
+
+typedef std::function<void(const char* cmd, int m1, int m2)> ComandoMotorCallback;
 
 class Telemetria {
 private:
@@ -17,11 +20,16 @@ private:
     unsigned long _lastReconnectMillis;
     const unsigned long _reconnectInterval = 3000;
 
+    ComandoMotorCallback _motorCallback;
+
 public:
-    Telemetria(const char* ssid, const char* pass, const char* broker, int port, const char* clientId = "ESP32_SensorIR");
+    Telemetria(const char* ssid, const char* pass, const char* broker, int port, const char* clientId = "ESP32_IDLine");
+    void setMotorCallback(ComandoMotorCallback callback);
     void begin();
     void mantenerConexion(unsigned long currentMillis);
-    void publicar(const char* topic, const char* nombreSensor, int valor, int error);
+    void procesarMensaje(char* topic, byte* payload, unsigned int length);
+    void publicarSensores(const int valores[8], int error);
+    void publicarEstadoMotores(int m1, int m2, const char* status);
 };
 
 #endif
