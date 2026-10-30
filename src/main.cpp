@@ -16,7 +16,7 @@ const uint8_t PIN_AIN2 = 22;
 const uint8_t PIN_PWMA = 4;
 const uint8_t PIN_BIN1 = 25;
 const uint8_t PIN_BIN2 = 26;
-const uint8_t PIN_PWMB = 17;
+const uint8_t PIN_PWMB = 16;
 
 const char* WIFI_SSID   = "ANDRES-LOPEZ";
 const char* WIFI_PASS   = "Gallego162783";
