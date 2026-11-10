@@ -4,9 +4,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <functional>
+#include "motor.h"
 
-typedef std::function<void(const char* cmd, int m1, int m2)> ComandoMotorCallback;
+#define TOPIC_SENSORES         "telemetria/sensores"
+#define TOPIC_CONTROL_MOTORES  "control/motores"
+#define TOPIC_ESTADO_MOTORES   "telemetria/motores/estado"
 
 class Telemetria {
 private:
@@ -15,16 +17,16 @@ private:
     const char* _broker;
     int _port;
     const char* _clientId;
+    Motor& _motor;
     WiFiClient _espClient;
     PubSubClient _mqtt;
     unsigned long _lastReconnectMillis;
     const unsigned long _reconnectInterval = 3000;
-
-    ComandoMotorCallback _motorCallback;
+    unsigned long _lastWifiReconnectMillis;
+    const unsigned long _wifiReconnectInterval = 5000;
 
 public:
-    Telemetria(const char* ssid, const char* pass, const char* broker, int port, const char* clientId = "ESP32_IDLine");
-    void setMotorCallback(ComandoMotorCallback callback);
+    Telemetria(const char* ssid, const char* pass, const char* broker, int port, Motor& motor, const char* clientId = "ESP32_IDLine");
     void begin();
     void mantenerConexion(unsigned long currentMillis);
     void procesarMensaje(char* topic, byte* payload, unsigned int length);

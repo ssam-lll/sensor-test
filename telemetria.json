@@ -41,7 +41,7 @@
     {
         "id": "1c8f99ae2553855b",
         "type": "ui_group",
-        "name": "Valor actual",
+        "name": "Estado Actual Barra (8CH)",
         "tab": "60afd890d0ca291e",
         "order": 1,
         "disp": true,
@@ -104,7 +104,7 @@
         "type": "function",
         "z": "tab_telemetria",
         "name": "Preparar INSERT",
-        "func": "const data = msg.payload;\n\nif (!data) return null;\n\nif (data.error && data.error !== 0) {\n    return [null, { payload: \"Error en el sensor: codigo \" + data.error }];\n}\n\n// Soporta tanto array de 8 sensores como formato individual previo\nlet lecturas = [];\nif (Array.isArray(data.sensores)) {\n    lecturas = data.sensores.map((val, idx) => ({ sensor: 's' + idx, valor: parseFloat(val) }));\n} else if (data.sensor && data.valor !== undefined) {\n    lecturas = [{ sensor: String(data.sensor), valor: parseFloat(data.valor) }];\n} else {\n    return [null, { payload: \"Formato de telemetria no valido\" }];\n}\n\nlet placeholders = [];\nlet params = [];\nfor (let i = 0; i < lecturas.length; i++) {\n    placeholders.push(\"(?, ?)\");\n    params.push(lecturas[i].sensor, lecturas[i].valor);\n}\n\nconst query = \"INSERT INTO telemetria (sensor, valor) VALUES \" + placeholders.join(\", \") + \";\";\n\nconst dbMsg = {\n    topic: query,\n    payload: params,\n    lectura: lecturas\n};\n\nreturn [dbMsg, null];",
+        "func": "const data = msg.payload;\n\nif (!data) return null;\n\nif (data.error && data.error !== 0) {\n    return [null, { payload: \"Error en el sensor: codigo \" + data.error }];\n}\n\nlet lecturas = [];\nif (Array.isArray(data.sensores)) {\n    lecturas = data.sensores.map((val, idx) => ({ sensor: 'S' + idx, valor: parseFloat(val) }));\n} else if (data.sensor && data.valor !== undefined) {\n    lecturas = [{ sensor: String(data.sensor), valor: parseFloat(data.valor) }];\n} else {\n    return [null, { payload: \"Formato de telemetria no valido\" }];\n}\n\nlet placeholders = [];\nlet params = [];\nfor (let i = 0; i < lecturas.length; i++) {\n    placeholders.push(\"(?, ?)\");\n    params.push(lecturas[i].sensor, lecturas[i].valor);\n}\n\nconst query = \"INSERT INTO telemetria (sensor, valor) VALUES \" + placeholders.join(\", \") + \";\";\n\nconst dbMsg = {\n    topic: query,\n    payload: params,\n    lectura: lecturas\n};\n\nreturn [dbMsg, null];",
         "outputs": 2,
         "timeout": "",
         "noerr": 0,
@@ -140,50 +140,89 @@
         "id": "fn_preparar_select",
         "type": "function",
         "z": "tab_telemetria",
-        "name": "Preparar SELECT",
-        "func": "if (!msg.lectura || !msg.payload || msg.payload.affectedRows < 1) {\n    return null;\n}\n\n// Devuelve cada sensor como mensaje individual para alimentar el grafico y el gauge\nreturn [msg.lectura.map(item => ({\n    topic: item.sensor,\n    payload: item.valor\n}))];",
-        "outputs": 1,
+        "name": "Preparar SELECT y Estado Barra",
+        "func": "if (!msg.lectura || !msg.payload || msg.payload.affectedRows < 1) {\n    return null;\n}\n\nconst serie = msg.lectura.map(item => ({\n    topic: String(item.sensor).toUpperCase(),\n    payload: item.valor\n}));\n\nconst valores = msg.lectura.map(item => Math.round(item.valor));\nlet sumaPonderada = 0;\nlet sumaActiva = 0;\nlet maxVal = 0;\n\nfor (let i = 0; i < valores.length; i++) {\n    const v = valores[i];\n    if (v > maxVal) maxVal = v;\n    if (v > 500) {\n        sumaPonderada += v * (i * 1000);\n        sumaActiva += v;\n    }\n}\n\nlet posicion = 0;\nlet zona = \"SIN LINEA\";\nif (sumaActiva > 0 && maxVal > 500) {\n    posicion = Math.round((sumaPonderada / sumaActiva) - 3500);\n    if (posicion < -600) {\n        zona = \"IZQUIERDA\";\n    } else if (posicion > 600) {\n        zona = \"DERECHA\";\n    } else {\n        zona = \"CENTRO\";\n    }\n}\n\nconst estadoBarra = {\n    payload: {\n        valores: valores,\n        posicion: posicion,\n        zona: zona,\n        maxVal: maxVal\n    }\n};\n\nreturn [serie, estadoBarra];",
+        "outputs": 2,
         "timeout": "",
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 800,
+        "x": 810,
         "y": 200,
         "wires": [
             [
                 "231de22833a3c5df",
                 "aec95a55bf6512d2"
+            ],
+            [
+                "ui_template_barra"
             ]
         ]
     },
     {
         "id": "aec95a55bf6512d2",
-        "type": "ui_gauge",
+        "type": "ui_chart",
         "z": "tab_telemetria",
-        "name": "IR Promedio/Actual",
+        "name": "Perfil en Vivo (S0 - S7)",
         "group": "1c8f99ae2553855b",
-        "order": 0,
+        "order": 1,
         "width": 6,
         "height": 4,
-        "gtype": "gage",
-        "title": "IR",
-        "label": "units",
-        "format": "{{value}}",
-        "min": 0,
-        "max": "4095",
+        "label": "Perfil en Vivo (S0 - S7)",
+        "chartType": "bar",
+        "legend": "false",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "Esperando lecturas...",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "4095",
+        "removeOlder": 1,
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
         "colors": [
-            "#00b500",
-            "#e6e600",
-            "#ca3838"
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd"
         ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
+        "outputs": 1,
+        "useDifferentColor": true,
         "className": "",
-        "x": 1050,
-        "y": 160,
-        "wires": []
+        "x": 1070,
+        "y": 140,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_template_barra",
+        "type": "ui_template",
+        "z": "tab_telemetria",
+        "group": "1c8f99ae2553855b",
+        "name": "Matriz Numerica 8CH",
+        "order": 2,
+        "width": 6,
+        "height": 3,
+        "format": "<div style=\"font-family: monospace; padding: 4px;\">\n  <div style=\"display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; text-align: center;\">\n    <div ng-repeat=\"val in msg.payload.valores track by $index\"\n         style=\"border: 1px solid #555; border-radius: 4px; padding: 6px 2px; background-color: {{ val > 1800 ? '#1e293b' : '#f8fafc' }}; color: {{ val > 1800 ? '#f8fafc' : '#0f172a' }};\">\n      <div style=\"font-size: 10px; opacity: 0.75;\">S{{$index}}</div>\n      <div style=\"font-size: 12px; font-weight: bold;\">{{val}}</div>\n    </div>\n  </div>\n  <div style=\"margin-top: 8px; padding: 6px; border-radius: 4px; background: #0f172a; color: #e2e8f0; text-align: center; font-size: 12px;\">\n    <span>Posición: <strong>{{msg.payload.posicion || 0}}</strong></span>\n    <span style=\"margin-left: 12px;\">Zona: <strong>{{msg.payload.zona || 'ESPERANDO'}}</strong></span>\n  </div>\n</div>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1080,
+        "y": 200,
+        "wires": [
+            []
+        ]
     },
     {
         "id": "231de22833a3c5df",
@@ -302,7 +341,7 @@
         "type": "function",
         "z": "tab_telemetria",
         "name": "Formatear Comando Motores",
-        "func": "context.m1 = context.m1 || 0;\ncontext.m2 = context.m2 || 0;\n\nif (msg.topic === 'stop') {\n    context.m1 = 0;\n    context.m2 = 0;\n    return { payload: { cmd: 'stop', m1: 0, m2: 0 } };\n}\n\nif (msg.topic === 'm1') {\n    let v1 = parseInt(msg.payload) || 0;\n    context.m1 = (Math.abs(v1) <= 10) ? 0 : v1;\n}\nif (msg.topic === 'm2') {\n    let v2 = parseInt(msg.payload) || 0;\n    context.m2 = (Math.abs(v2) <= 10) ? 0 : v2;\n}\n\nreturn {\n    payload: {\n        cmd: 'set_motores',\n        m1: context.m1,\n        m2: context.m2\n    }\n};",
+        "func": "context.m1 = context.m1 || 0;\ncontext.m2 = context.m2 || 0;\n\nif (msg.topic === 'stop') {\n    context.m1 = 0;\n    context.m2 = 0;\n    return { payload: { cmd: 'stop', m1: 0, m2: 0 } };\n}\n\nif (msg.topic === 'm1') {\n    context.m1 = parseInt(msg.payload) || 0;\n}\nif (msg.topic === 'm2') {\n    context.m2 = parseInt(msg.payload) || 0;\n}\n\nreturn {\n    payload: {\n        cmd: 'set_motores',\n        m1: context.m1,\n        m2: context.m2\n    }\n};",
         "outputs": 1,
         "timeout": "",
         "noerr": 0,
@@ -365,7 +404,7 @@
         "y": 600,
         "wires": [
             [
-                "pub_motores"
+                "fn_secuencia_test"
             ]
         ]
     },
@@ -443,5 +482,25 @@
             "node-red-node-mysql": "3.0.3",
             "node-red-dashboard": "3.6.6"
         }
+    },
+    {
+        "id": "fn_secuencia_test",
+        "type": "function",
+        "z": "tab_telemetria",
+        "name": "Orquestar Secuencia de Prueba",
+        "func": "node.send({ payload: { cmd: 'set_motores', m1: 180, m2: 0 } });\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'stop', m1: 0, m2: 0 } });\n}, 400);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'set_motores', m1: -180, m2: 0 } });\n}, 550);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'stop', m1: 0, m2: 0 } });\n}, 950);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'set_motores', m1: 0, m2: 180 } });\n}, 1100);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'stop', m1: 0, m2: 0 } });\n}, 1500);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'set_motores', m1: 0, m2: -180 } });\n}, 1650);\n\nsetTimeout(() => {\n    node.send({ payload: { cmd: 'stop', m1: 0, m2: 0 } });\n}, 2050);\n\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 600,
+        "wires": [
+            [
+                "pub_motores"
+            ]
+        ]
     }
 ]

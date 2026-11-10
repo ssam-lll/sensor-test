@@ -72,24 +72,3 @@ void Motor::frenar() {
     digitalWrite(_pinBIN2, LOW);
     analogWrite(_pinPWMB, 0);
 }
-
-void Motor::ejecutarPrueba() {
-    setMotorIzquierdo(180);
-    delay(400);
-    frenar();
-    delay(150);
-
-    setMotorIzquierdo(-180);
-    delay(400);
-    frenar();
-    delay(150);
-
-    setMotorDerecho(180);
-    delay(400);
-    frenar();
-    delay(150);
-
-    setMotorDerecho(-180);
-    delay(400);
-    frenar();
-}

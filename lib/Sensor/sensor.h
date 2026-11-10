@@ -14,6 +14,7 @@ public:
     BarraSensores(Multiplexor& mux);
     void begin();
     void leerBarra(int valores[8]);
+    int leerBarraConDiagnostico(int valores[8]);
     int verificarError(int valor);
 };
 

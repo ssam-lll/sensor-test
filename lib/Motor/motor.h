@@ -25,7 +25,6 @@ public:
     void setMotorDerecho(int velocidad);
     void setMotores(int velM1, int velM2);
     void frenar();
-    void ejecutarPrueba();
 
     int getVelocidadM1() const { return _velM1; }
     int getVelocidadM2() const { return _velM2; }
